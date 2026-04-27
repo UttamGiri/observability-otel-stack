@@ -1,0 +1,6 @@
+apiVersion: v2
+name: python-otel-app
+description: Python sample app with OTLP metrics and Prometheus exporter
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

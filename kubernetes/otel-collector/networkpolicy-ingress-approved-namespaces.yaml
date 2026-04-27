@@ -1,0 +1,34 @@
+# OTLP ingress to the collector: only Pods in allowed namespaces can connect.
+#
+# Example namespaces: dxp (Python app), axp — add more names under `values:` below.
+# Namespaces get default label kubernetes.io/metadata.name=<name> (Kubernetes 1.22+).
+#
+# Requires a CNI that enforces NetworkPolicy (OpenShift OVN-K / Calico / Cilium).
+# Apply this in the SAME namespace where otel-collector runs (edit metadata.namespace).
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: otel-collector-allow-approved-namespaces
+  namespace: observability # TODO: namespace where otel-collector runs
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: otel-collector
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow OTLP only from listed namespaces (edit `values` to add/remove).
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - dxp
+                  - axp
+      ports:
+        - protocol: TCP
+          port: 4317
+        - protocol: TCP
+          port: 4318
