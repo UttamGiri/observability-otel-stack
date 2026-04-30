@@ -17,7 +17,9 @@ For **multiple namespaces** as a layout choice and **instrumentation injection**
 
 ## End-to-end data flow
 
-Telemetry leaves the app over **OTLP** to the collector. The collector exposes a **Prometheus** scrape endpoint for metrics that were received and processed in the metrics pipeline.
+Telemetry leaves the app over **OTLP** aimed at the collector **Service** (cluster DNS, e.g. `otel-collector.observability.svc.cluster.local:4317`—adjust the namespace segment for your layout). Kubernetes routes that traffic to the collector **Pod** via Service **Endpoints** (same ClusterIP object also exposes `:9464` for scraping). The collector process exposes a **Prometheus** scrape endpoint for metrics that were received and processed in the metrics pipeline.
+
+You do **not** need to create the Service before the Pod for a special ordering reason: `Service` and `Deployment` are independent; once matching Pods are Ready, the Service’s Endpoints point at them. Clients should **always** use the Service name for OTLP, not a Pod IP, so DNS stays stable and multiple replicas load-balance.
 
 ```mermaid
 flowchart LR
@@ -26,18 +28,19 @@ flowchart LR
   end
 
   subgraph obs["Collector namespace e.g. observability"]
+    SVC["otel-collector Service\n:4317 OTLP / :9464 scrape"]
     COLL["otel-collector Pod"]
     CM["ConfigMap\notel-collector-config"]
     CM -.->|"mount"| COLL
+    SVC -->|"Endpoints → Pod"| COLL
   end
 
   subgraph prom["Metrics consumers"]
     UWM["Prometheus\nuser workload / platform"]
   end
 
-  PY -->|"OTLP gRPC :4317\n(batch + exporters)"| COLL
-  COLL -->|"prometheus exporter\n:9464"| SVC_COL["Collector Service"]
-  SVC_COL --> UWM
+  PY -->|"OTLP gRPC :4317"| SVC
+  UWM -->|"HTTP scrape :9464"| SVC
 ```
 
 ---
